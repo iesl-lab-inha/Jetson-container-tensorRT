@@ -17,11 +17,11 @@ from _thread import *
 from tensorflow.python.compiler.tensorrt import trt_convert as trt
 
 enclosure_queue = Queue()
-PATH_TO_CKPT = os.path.join('data','ssd_mobilenet_v2_coco_2018_03_29','frozen_inference_graph.pb')
+PATH_TO_CKPT = os.path.join('ssd_mobilenet_v2_coco_2018_03_29','frozen_inference_graph.pb')
 PATH_TO_LABELS = os.path.join('data','mscoco_label_map.pbtxt')
 
 NUM_CLASSES=90
-HOST = sys.argv[1]
+HOST = ""
 PORT = 31100
 
 def recvall(sock, count):
