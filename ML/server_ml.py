@@ -14,15 +14,20 @@ from matplotlib import pyplot as plt
 from PIL import Image
 from queue import Queue
 from _thread import *
-from tensorflow.python.compiler.tensorrt import trt_convert as trt
 
 enclosure_queue = Queue()
 PATH_TO_CKPT = os.path.join('ssd_mobilenet_v2_coco_2018_03_29','frozen_inference_graph.pb')
-PATH_TO_LABELS = os.path.join('data','mscoco_label_map.pbtxt')
+PATH_TO_LABELS = os.path.join('mscoco_label_map.pbtxt')
 
 NUM_CLASSES=90
-HOST = ""
-PORT = 31100
+HOST = ''
+PORT = 5500
+
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server_socket.bind((HOST, PORT))
+server_socket.listen()
+print('server start',HOST)
 
 def recvall(sock, count):
     buf = b''
@@ -33,18 +38,7 @@ def recvall(sock, count):
         count -= len(newbuf)
     return buf
 
-def main():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen()
-    print('server start',HOST)
-    client_socket, addr = server_socket.accept()
-
-
-    #client_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
-    #client_socket.connect((HOST, PORT)) 
-    #message = '0'
+def main(cli_socket):
     print('Model load')
     detection_graph = tf.Graph()
     with detection_graph.as_default():
@@ -67,9 +61,9 @@ def main():
             classes = detection_graph.get_tensor_by_name('detection_classes:0')
             num_detections = detection_graph.get_tensor_by_name('num_detections:0')
             
-            client_socket.send(message.encode())
-            length = recvall(client_socket,16)
-            stringData = recvall(client_socket, int(length))
+            cli_socket.send(message.encode())
+            length = recvall(cli_socket,16)
+            stringData = recvall(cli_socket, int(length))
             
             data = np.frombuffer(stringData, dtype='uint8')
             image_np=cv2.imdecode(data,1)
@@ -81,17 +75,16 @@ def main():
             cls_name =  np.squeeze(classes.astype(np.int32))
             for i, v in enumerate(classes[0]):
                 if float(scores[0][i]) > 0.4:
-                    print("object : {}, score : {}".format(category_index[cls_name[i]]['name'],scores[0][i]))
+                    print("object : {}, score : {} \n box : {}".format(category_index[cls_name[i]]['name'],scores[0][i],boxes[0][i]))
             print("NN Runtime : %0.3f sec"%(time.time()- came_time))
             print("Entire Test Runtime : %0.3f sec"%(time.time() - overall_time))
             #num = int(num_detections)
             #for i in range(num):
                 #print(str(classes[0][i])+str(scores[0][i]))
             #cv2.imshow('Image',decimg)
-
+        cli_socket.close()
 
 if __name__ == '__main__':
-    main()
-    
-    server_socket.close()
-
+    while True:
+        client_socket, addr = server_socket.accept()
+        start_new_thread(main,(client_socket,))
